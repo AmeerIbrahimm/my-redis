@@ -1,25 +1,38 @@
-use mini_redis::{ Connection, Frame};
+use bytes::Bytes;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
+
+use mini_redis::{Connection, Frame};
 use tokio::net::{TcpListener, TcpStream};
+
+type Db = Arc<Mutex<HashMap<String, Bytes>>>;
 
 #[tokio::main]
 async fn main() {
     // Bind the listener to Address
     let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
 
+    println!("listenting...");
+
+    // intialize the db
+    let db = Arc::new(Mutex::new(HashMap::new()));
+
     loop {
         let (socket, _) = listener.accept().await.unwrap();
+        // Clone the db handle
+        let db = db.clone();
+
+        println!("Accepted");
         tokio::spawn(async move {
-            process(socket).await;
+            process(socket, db).await;
         });
     }
 }
 
-async fn process(socket: TcpStream) {
-    use mini_redis::Command::{Get,Set,self};
-    use std::collections::HashMap;
-
-    // A hashmap to store data
-    let mut db  = HashMap::new();
+async fn process(socket: TcpStream, db: Db) {
+    use mini_redis::Command::{self, Get, Set};
 
     // The `Connection` let us read/write redis **frames** instead of byte streams
     // Type is defined by mini-redis
@@ -27,24 +40,23 @@ async fn process(socket: TcpStream) {
 
     // Use `read_frame` to receive a command from the connection.
     while let Some(frame) = connection.read_frame().await.unwrap() {
-
         let response = match Command::from_frame(frame).unwrap() {
             Set(cmd) => {
-                db.insert(cmd.key().to_string(), cmd.value().to_vec());
+                let mut db = db.lock().unwrap();
+                db.insert(cmd.key().to_string(), cmd.value().clone());
                 Frame::Simple("OK".to_string())
-            },
+            }
             Get(cmd) => {
+                let db = db.lock().unwrap();
                 if let Some(value) = db.get(cmd.key()) {
                     Frame::Bulk(value.clone().into())
                 } else {
                     Frame::Null
                 }
             }
-            ,
             cmd => {
-                panic!("unimplemented: {:?}",cmd)
+                panic!("unimplemented: {:?}", cmd)
             }
-
         };
         // write the response to the client
         connection.write_frame(&response).await.unwrap();
