@@ -12,6 +12,7 @@ async fn main() -> io::Result<()> {
             // let (mut rd, mut wr) = socket.split();
             loop {
                 match socket.read(&mut buf).await {
+                    // return if connection end
                     Ok(0) => return ,
                     Ok(n) => {
                         if socket.write_all(&buf[..n]).await.is_err() {
@@ -19,6 +20,7 @@ async fn main() -> io::Result<()> {
                         }
                     },
                     Err(_) => {
+                        // we can't do anyting here
                         return;
                     }
                 }
