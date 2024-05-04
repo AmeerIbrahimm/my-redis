@@ -7,23 +7,30 @@ async fn main() {
     let (tx, mut rx) = mpsc::channel(32);
     let tx1 = tx.clone();
 
-    let t1 =tokio::spawn(async move {
+    let t1 = tokio::spawn(async move {
         let (resp_tx, resp_rx) = oneshot::channel();
-        let cmd = Command::Get { key: "foo".to_string(), resp: resp_tx };
+        let cmd = Command::Get {
+            key: "foo".to_string(),
+            resp: resp_tx,
+        };
         // Send the GET request
         tx.send(cmd).await.unwrap();
         // await for response
         let res = resp_rx.await;
-        println!("GOT: {:?}",res);
+        println!("GOT: {:?}", res);
     });
-    let t2 =tokio::spawn(async move {
+    let t2 = tokio::spawn(async move {
         let (resp_tx, resp_rx) = oneshot::channel();
-        let cmd = Command::Set { key: "foo".to_string(), val: "bar".into(), resp: resp_tx };
+        let cmd = Command::Set {
+            key: "foo".to_string(),
+            val: "bar".into(),
+            resp: resp_tx,
+        };
         // Send the SET request
         tx1.send(cmd).await.unwrap();
         // await for response
         let res = resp_rx.await;
-        println!("GOT: {:?}",res);
+        println!("GOT: {:?}", res);
     });
 
     let manager = tokio::spawn(async move {
@@ -36,11 +43,11 @@ async fn main() {
 
             match command {
                 Get { key, resp } => {
-                    let res =client.get(&key).await;
+                    let res = client.get(&key).await;
                     let _ = resp.send(res);
                 }
-                Set { key, val ,resp} => {
-                    let res =client.set(&key, val).await;
+                Set { key, val, resp } => {
+                    let res = client.set(&key, val).await;
                     let _ = resp.send(res);
                 }
             }
@@ -54,8 +61,15 @@ async fn main() {
 
 #[derive(Debug)]
 enum Command {
-    Get { key: String, resp: Responder<Option<Bytes>> },
-    Set { key: String, val: Bytes,resp: Responder<()> },
+    Get {
+        key: String,
+        resp: Responder<Option<Bytes>>,
+    },
+    Set {
+        key: String,
+        val: Bytes,
+        resp: Responder<()>,
+    },
 }
 
 type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
