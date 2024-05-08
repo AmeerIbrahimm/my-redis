@@ -8,17 +8,17 @@ async fn main() -> io::Result<()> {
     loop {
         let (mut socket, _) = listener.accept().await?;
         tokio::spawn(async move {
-            let mut buf =[0;1024];
+            let mut buf = [0; 1024];
             // let (mut rd, mut wr) = socket.split();
             loop {
                 match socket.read(&mut buf).await {
                     // return if connection end
-                    Ok(0) => return ,
+                    Ok(0) => return,
                     Ok(n) => {
                         if socket.write_all(&buf[..n]).await.is_err() {
-                            return ;
+                            return;
                         }
-                    },
+                    }
                     Err(_) => {
                         // we can't do anyting here
                         return;
